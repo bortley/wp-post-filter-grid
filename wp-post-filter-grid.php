@@ -242,139 +242,123 @@ if ( ! is_array( $dropdowns ) ) {
 
             <hr />
 
-            <h2>Filter Dropdowns</h2>
-            <p>
-                Here you can define up to <strong>3 dropdown filters</strong> for the grid.
-                Each dropdown can target <em>categories</em> or <em>tags</em>, and you get to
-                choose the specific terms that appear in it.
-            </p>
-            <p>
-                <strong>Note:</strong> Leave the "Dropdown label" empty to disable that dropdown.
-            </p>
+<h2>Filter Dropdowns</h2>
+<p>Create as many dropdown filters as you want. Leave the label empty to disable a dropdown.</p>
 
+<div id="wp-pfg-dropdowns-container">
+    <?php
+    if ( ! empty( $dropdowns ) ) :
+        foreach ( $dropdowns as $i => $dropdown ) :
+            $label    = isset( $dropdown['label'] ) ? $dropdown['label'] : '';
+            $taxonomy = isset( $dropdown['taxonomy'] ) ? $dropdown['taxonomy'] : 'category';
+            $terms    = isset( $dropdown['terms'] ) ? (array) $dropdown['terms'] : array();
+    ?>
+
+    <div class="wp-pfg-dropdown-block">
+        <h3>Dropdown <?php echo ( $i + 1 ); ?></h3>
+
+        <p>
+            <label>
+                Label:<br>
+                <input type="text" name="wp_pfg_filter_dropdowns[<?php echo $i; ?>][label]"
+                       value="<?php echo esc_attr( $label ); ?>" class="regular-text">
+            </label>
+        </p>
+
+        <p>
+            <label>
+                Taxonomy:<br>
+                <select name="wp_pfg_filter_dropdowns[<?php echo $i; ?>][taxonomy]">
+                    <option value="category" <?php selected( $taxonomy, 'category' ); ?>>Categories</option>
+                    <option value="post_tag" <?php selected( $taxonomy, 'post_tag' ); ?>>Tags</option>
+                </select>
+            </label>
+        </p>
+
+        <p>Terms:</p>
+
+        <div class="wp-pfg-terms-box">
             <?php
-            // We'll allow up to 3 dropdowns for now.
-            $max_dropdowns = 3;
-
-            for ( $i = 0; $i < $max_dropdowns; $i++ ) :
-
-                $current = isset( $dropdowns[ $i ] ) && is_array( $dropdowns[ $i ] )
-                    ? $dropdowns[ $i ]
-                    : array();
-
-                $label          = isset( $current['label'] ) ? $current['label'] : '';
-                $taxonomy       = isset( $current['taxonomy'] ) ? $current['taxonomy'] : 'category';
-                $selected_terms = isset( $current['terms'] ) && is_array( $current['terms'] )
-                    ? $current['terms']
-                    : array();
+            $term_list = ( $taxonomy === 'post_tag' ) ? $tags : $categories;
+            foreach ( $term_list as $term ) :
+                $checked = in_array( (int) $term->term_id, $terms, true ) ? 'checked' : '';
             ?>
-                <h3>Dropdown <?php echo ( $i + 1 ); ?></h3>
+                <label style="display:block;">
+                    <input type="checkbox"
+                           name="wp_pfg_filter_dropdowns[<?php echo $i; ?>][terms][]"
+                           value="<?php echo esc_attr( $term->term_id ); ?>"
+                           <?php echo $checked; ?>>
+                    <?php echo esc_html( $term->name ); ?>
+                </label>
+            <?php endforeach; ?>
+        </div>
 
-                <table class="form-table" role="presentation">
-                    <tr>
-                        <th scope="row">
-                            <label for="wp_pfg_filter_dropdowns_<?php echo $i; ?>_label">
-                                Dropdown label
-                            </label>
-                        </th>
-                        <td>
-                            <input
-                                type="text"
-                                class="regular-text"
-                                id="wp_pfg_filter_dropdowns_<?php echo $i; ?>_label"
-                                name="wp_pfg_filter_dropdowns[<?php echo $i; ?>][label]"
-                                value="<?php echo esc_attr( $label ); ?>"
-                                placeholder="e.g. Topic, Content Type, Tag"
-                            />
-                            <p class="description">
-                                Leave blank to disable this dropdown.
-                            </p>
-                        </td>
-                    </tr>
+        <p><button type="button" class="button wp-pfg-remove-dropdown">Remove</button></p>
+        <hr>
 
-                    <tr>
-                        <th scope="row">
-                            Taxonomy
-                        </th>
-                        <td>
-                            <select
-                                name="wp_pfg_filter_dropdowns[<?php echo $i; ?>][taxonomy]"
-                            >
-                                <option value="category" <?php selected( $taxonomy, 'category' ); ?>>
-                                    Categories
-                                </option>
-                                <option value="post_tag" <?php selected( $taxonomy, 'post_tag' ); ?>>
-                                    Tags
-                                </option>
-                            </select>
-                            <p class="description">
-                                Change this and click "Save Changes", then reload to see the correct term list.
-                            </p>
-                        </td>
-                    </tr>
+    </div>
 
-                    <tr>
-                        <th scope="row">
-                            Terms to include
-                        </th>
-                        <td>
-                            <?php if ( 'category' === $taxonomy ) : ?>
+    <?php endforeach; endif; ?>
+</div>
 
-                                <?php if ( ! empty( $categories ) ) : ?>
-                                    <div style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 8px;">
-                                        <?php foreach ( $categories as $cat ) : ?>
-                                            <?php
-                                            $checked = in_array( (int) $cat->term_id, $selected_terms, true )
-                                                ? 'checked="checked"'
-                                                : '';
-                                            ?>
-                                            <label style="display: block; margin-bottom: 4px;">
-                                                <input
-                                                    type="checkbox"
-                                                    name="wp_pfg_filter_dropdowns[<?php echo $i; ?>][terms][]"
-                                                    value="<?php echo esc_attr( $cat->term_id ); ?>"
-                                                    <?php echo $checked; ?>
-                                                />
-                                                <?php echo esc_html( $cat->name ); ?>
-                                            </label>
-                                        <?php endforeach; ?>
-                                    </div>
-                                <?php else : ?>
-                                    <p>No categories found.</p>
-                                <?php endif; ?>
+<p><button type="button" class="button button-primary" id="wp-pfg-add-dropdown">Add Dropdown</button></p>
 
-                            <?php else : // post_tag ?>
-
-                                <?php if ( ! empty( $tags ) && ! is_wp_error( $tags ) ) : ?>
-                                    <div style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 8px;">
-                                        <?php foreach ( $tags as $tag ) : ?>
-                                            <?php
-                                            $checked = in_array( (int) $tag->term_id, $selected_terms, true )
-                                                ? 'checked="checked"'
-                                                : '';
-                                            ?>
-                                            <label style="display: block; margin-bottom: 4px;">
-                                                <input
-                                                    type="checkbox"
-                                                    name="wp_pfg_filter_dropdowns[<?php echo $i; ?>][terms][]"
-                                                    value="<?php echo esc_attr( $tag->term_id ); ?>"
-                                                    <?php echo $checked; ?>
-                                                />
-                                                <?php echo esc_html( $tag->name ); ?>
-                                            </label>
-                                        <?php endforeach; ?>
-                                    </div>
-                                <?php else : ?>
-                                    <p>No tags found.</p>
-                                <?php endif; ?>
-
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                </table>
-            <?php endfor; ?>
 
             <?php submit_button(); ?>
+		<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const container = document.getElementById('wp-pfg-dropdowns-container');
+    const addBtn = document.getElementById('wp-pfg-add-dropdown');
+
+    addBtn.addEventListener('click', function () {
+        // Determine new index
+        const index = container.querySelectorAll('.wp-pfg-dropdown-block').length;
+
+        // Template for new dropdown
+        const template = `
+        <div class="wp-pfg-dropdown-block">
+            <h3>Dropdown ${index + 1}</h3>
+
+            <p>
+                <label>
+                    Label:<br>
+                    <input type="text" name="wp_pfg_filter_dropdowns[${index}][label]" class="regular-text">
+                </label>
+            </p>
+
+            <p>
+                <label>
+                    Taxonomy:<br>
+                    <select name="wp_pfg_filter_dropdowns[${index}][taxonomy]" class="taxonomy-select">
+                        <option value="category">Categories</option>
+                        <option value="post_tag">Tags</option>
+                    </select>
+                </label>
+            </p>
+
+            <p>Terms:</p>
+
+            <div class="wp-pfg-terms-box">
+                <p style="opacity:0.6;">Select a taxonomy and save to load terms.</p>
+            </div>
+
+            <p><button type="button" class="button wp-pfg-remove-dropdown">Remove</button></p>
+            <hr>
+        </div>
+        `;
+
+        container.insertAdjacentHTML('beforeend', template);
+    });
+
+    // Remove button handler
+    container.addEventListener('click', function (e) {
+        if (e.target.classList.contains('wp-pfg-remove-dropdown')) {
+            e.target.closest('.wp-pfg-dropdown-block').remove();
+        }
+    });
+});
+</script>
+
         </form>
     </div>
 <?php
@@ -654,6 +638,10 @@ ob_start();
 
 <!-- Post Grid -->
 <div class="wp-pfg-grid">
+	<div class="wp-pfg-no-results" style="display:none;">
+    No results found.
+</div>
+
     <?php foreach ( $posts_data as $post ) : ?>
         <?php
         // Space-separated categories.

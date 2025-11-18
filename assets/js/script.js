@@ -1,60 +1,84 @@
-// Wrap in IIFE to avoid polluting global scope
-(function ($) {
+// Global-safe, page-builder-proof filtering script
+(function() {
     'use strict';
 
-    $(document).ready(function () {
-        // Dropdowns and cards
-        const $dropdowns = $('.wp-pfg-filter-select');
-        const $cards = $('.wp-pfg-card');
+    /**
+     * Apply the filters by reading dropdown values and hiding/showing post cards.
+     */
+    function applyFilters() {
 
-        /**
-         * Apply filters based on the currently selected dropdown values.
-         */
-        function applyFilters() {
-            const activeFilters = [];
+        // 1. Collect all active filters
+        const dropdowns = document.querySelectorAll('.wp-pfg-filter-select');
+        const activeFilters = [];
 
-            // Collect selected values (ignoring "All" / empty)
-            $dropdowns.each(function () {
-                const value = $(this).val();
-                if (value) {
-                    activeFilters.push(String(value));
-                }
-            });
+        dropdowns.forEach(drop => {
+            const val = drop.value;
+            if (val && val.trim() !== '') {
+                activeFilters.push(val.trim());
+            }
+        });
 
-            // If no filters selected, show everything
-            if (activeFilters.length === 0) {
-                $cards.removeClass('is-hidden');
+        // 2. Get all cards in the grid
+        const cards = document.querySelectorAll('.wp-pfg-card');
+
+        // 3. If no filters are selected → show everything
+        if (activeFilters.length === 0) {
+            cards.forEach(card => card.classList.remove('is-hidden'));
+            return;
+        }
+
+        // 4. Otherwise filter each card
+        cards.forEach(card => {
+
+            const termsAttr = card.getAttribute('data-terms');
+            if (!termsAttr || termsAttr.trim() === '') {
+                // No term data → does not match any filter
+                card.classList.add('is-hidden');
                 return;
             }
 
-            // Otherwise, check each card against all active filters (AND logic)
-            $cards.each(function () {
-                const $card = $(this);
-                const termsAttr = $card.data('terms');
+            const cardTerms = termsAttr.split(/\s+/);
 
-                if (!termsAttr) {
-                    // If card has no term data and filters are active, hide it
-                    $card.addClass('is-hidden');
-                    return;
-                }
+            // A card must match *every* active filter (AND logic)
+            const matches = activeFilters.every(token => cardTerms.includes(token));
 
-                const cardTerms = String(termsAttr).split(' ');
+            if (matches) {
+                card.classList.remove('is-hidden');
+            } else {
+                card.classList.add('is-hidden');
+            }
+        });
+		
+		// Show/hide "No results" message
+const noResults = document.querySelector('.wp-pfg-no-results');
+if (noResults) {
+    const visible = document.querySelectorAll('.wp-pfg-card:not(.is-hidden)');
+    if (visible.length === 0) {
+        noResults.style.display = 'block';
+    } else {
+        noResults.style.display = 'none';
+    }
+}
 
-                // Card must contain *every* active filter token
-                const matches = activeFilters.every(function (token) {
-                    return cardTerms.indexOf(token) !== -1;
-                });
+    }
 
-                if (matches) {
-                    $card.removeClass('is-hidden');
-                } else {
-                    $card.addClass('is-hidden');
-                }
-            });
+
+    /**
+     * Guaranteed event listener for dynamically inserted dropdowns.
+     * Works even if Elementor, Avada, or Gutenberg replaces <select>.
+     */
+    document.addEventListener('change', function(e) {
+        if (e.target && e.target.classList && e.target.classList.contains('wp-pfg-filter-select')) {
+            applyFilters();
         }
-
-        // Bind change event
-        $dropdowns.on('change', applyFilters);
     });
 
-})(jQuery);
+
+    /**
+     * Run an initial filter pass (in case dropdowns have pre-selected values)
+     */
+    document.addEventListener('DOMContentLoaded', function() {
+        applyFilters();
+    });
+
+})();

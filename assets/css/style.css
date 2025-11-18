@@ -104,7 +104,7 @@
     pointer-events: none;
     /* Optional: remove from layout visually but keep for screen readers if needed.
        If you want them not to take up space at all, you can set display: none here instead. */
-    display: none;
+    display: none !important;
 }
 
 /* Dropdown filter controls */
@@ -129,3 +129,26 @@
     background: #fff;
     font-size: 0.9rem;
 }
+
+.wp-pfg-no-results {
+    text-align: center;
+    padding: 2rem 1rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    opacity: 0.7;
+}
+
+.wp-pfg-dropdown-block { 
+    padding: 12px; 
+    background: #f9f9f9; 
+    border: 1px solid #ddd; 
+    margin-bottom: 16px; 
+}
+.wp-pfg-terms-box { 
+    max-height: 200px; 
+    overflow-y: auto; 
+    border: 1px solid #ddd; 
+    padding: 8px; 
+    background: #fff; 
+}
+
