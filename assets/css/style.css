@@ -106,3 +106,26 @@
        If you want them not to take up space at all, you can set display: none here instead. */
     display: none;
 }
+
+/* Dropdown filter controls */
+.wp-pfg-filter-dropdown {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.wp-pfg-filter-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.wp-pfg-filter-select {
+    min-width: 160px;
+    padding: 0.35rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid #ddd;
+    background: #fff;
+    font-size: 0.9rem;
+}

@@ -57,7 +57,7 @@ add_action( 'admin_menu', 'wp_pfg_add_settings_page' );
  * Register the setting that stores excluded category IDs.
  */
 function wp_pfg_register_settings() {
-    // This option will store an array of category IDs (as integers).
+    // Existing option: excluded category IDs.
     register_setting(
         'wp_pfg_settings_group',
         'wp_pfg_excluded_categories', // option name
@@ -67,8 +67,21 @@ function wp_pfg_register_settings() {
             'default'           => array(),
         )
     );
+
+    // NEW: option for dropdown filter definitions.
+    // This will be an array of dropdown configs.
+    register_setting(
+        'wp_pfg_settings_group',
+        'wp_pfg_filter_dropdowns',
+        array(
+            'type'              => 'array',
+            'sanitize_callback' => 'wp_pfg_sanitize_filter_dropdowns',
+            'default'           => array(),
+        )
+    );
 }
 add_action( 'admin_init', 'wp_pfg_register_settings' );
+
 
 /**
  * Sanitize the excluded categories option.
@@ -89,6 +102,69 @@ function wp_pfg_sanitize_excluded_categories( $input ) {
 }
 
 /**
+ * Sanitize the filter dropdown configuration.
+ *
+ * Structure:
+ * [
+ *   [
+ *     'label'    => (string),
+ *     'taxonomy' => 'category'|'post_tag',
+ *     'terms'    => [int term IDs...],
+ *   ],
+ *   ...
+ * ]
+ *
+ * @param mixed $input Raw input from the settings form.
+ * @return array Sanitized config.
+ */
+function wp_pfg_sanitize_filter_dropdowns( $input ) {
+    $sanitized = array();
+
+    if ( ! is_array( $input ) ) {
+        return $sanitized;
+    }
+
+    foreach ( $input as $dropdown ) {
+        // If nothing is set, skip it (acts like "disabled").
+        if (
+            ( empty( $dropdown['label'] ) || ! is_string( $dropdown['label'] ) ) &&
+            ( empty( $dropdown['terms'] ) || ! is_array( $dropdown['terms'] ) )
+        ) {
+            continue;
+        }
+
+        $label = isset( $dropdown['label'] )
+            ? sanitize_text_field( $dropdown['label'] )
+            : '';
+
+        $allowed_taxonomies = array( 'category', 'post_tag' );
+        $taxonomy = isset( $dropdown['taxonomy'] ) && in_array( $dropdown['taxonomy'], $allowed_taxonomies, true )
+            ? $dropdown['taxonomy']
+            : 'category';
+
+        $terms = array();
+        if ( isset( $dropdown['terms'] ) && is_array( $dropdown['terms'] ) ) {
+            foreach ( $dropdown['terms'] as $term_id ) {
+                $term_id = (int) $term_id;
+                if ( $term_id > 0 ) {
+                    $terms[] = $term_id;
+                }
+            }
+            $terms = array_values( array_unique( $terms ) );
+        }
+
+        $sanitized[] = array(
+            'label'    => $label,
+            'taxonomy' => $taxonomy,
+            'terms'    => $terms,
+        );
+    }
+
+    return $sanitized;
+}
+
+
+/**
  * Render the settings page HTML.
  */
 function wp_pfg_render_settings_page() {
@@ -96,23 +172,36 @@ function wp_pfg_render_settings_page() {
         return;
     }
 
-    // Get currently saved excluded categories (array of IDs).
-    $excluded_cats = get_option( 'wp_pfg_excluded_categories', array() );
+// Get currently saved excluded categories (array of IDs).
+$excluded_cats = get_option( 'wp_pfg_excluded_categories', array() );
 
-    // Get all categories.
-    $categories = get_categories( array(
+$categories = get_categories( array(
+    'hide_empty' => false,
+) );
+
+// NEW: get tags (for tag-based dropdowns).
+$tags = get_terms(
+    array(
+        'taxonomy'   => 'post_tag',
         'hide_empty' => false,
-    ) );
-    ?>
-    <div class="wrap">
-        <h1>Post Filter Grid Settings</h1>
+    )
+);
 
-        <form method="post" action="options.php">
-            <?php
-            // Output security fields for the registered setting.
-            settings_fields( 'wp_pfg_settings_group' );
-            do_settings_sections( 'wp_pfg_settings_group' );
-            ?>
+// NEW: current dropdown configuration.
+$dropdowns = get_option( 'wp_pfg_filter_dropdowns', array() );
+if ( ! is_array( $dropdowns ) ) {
+    $dropdowns = array();
+}
+?>
+<div class="wrap">
+    <h1>Post Filter Grid Settings</h1>
+
+    <form method="post" action="options.php">
+        <?php
+        settings_fields( 'wp_pfg_settings_group' );
+        do_settings_sections( 'wp_pfg_settings_group' );
+        ?>
+
 
             <h2>Exclude Categories</h2>
             <p>Select any categories you <strong>do not</strong> want to appear in:</p>
@@ -149,12 +238,148 @@ function wp_pfg_render_settings_page() {
                     </td>
                 </tr>
             </table>
+                        <!-- Existing "Exclude Categories" table ends above -->
+
+            <hr />
+
+            <h2>Filter Dropdowns</h2>
+            <p>
+                Here you can define up to <strong>3 dropdown filters</strong> for the grid.
+                Each dropdown can target <em>categories</em> or <em>tags</em>, and you get to
+                choose the specific terms that appear in it.
+            </p>
+            <p>
+                <strong>Note:</strong> Leave the "Dropdown label" empty to disable that dropdown.
+            </p>
+
+            <?php
+            // We'll allow up to 3 dropdowns for now.
+            $max_dropdowns = 3;
+
+            for ( $i = 0; $i < $max_dropdowns; $i++ ) :
+
+                $current = isset( $dropdowns[ $i ] ) && is_array( $dropdowns[ $i ] )
+                    ? $dropdowns[ $i ]
+                    : array();
+
+                $label          = isset( $current['label'] ) ? $current['label'] : '';
+                $taxonomy       = isset( $current['taxonomy'] ) ? $current['taxonomy'] : 'category';
+                $selected_terms = isset( $current['terms'] ) && is_array( $current['terms'] )
+                    ? $current['terms']
+                    : array();
+            ?>
+                <h3>Dropdown <?php echo ( $i + 1 ); ?></h3>
+
+                <table class="form-table" role="presentation">
+                    <tr>
+                        <th scope="row">
+                            <label for="wp_pfg_filter_dropdowns_<?php echo $i; ?>_label">
+                                Dropdown label
+                            </label>
+                        </th>
+                        <td>
+                            <input
+                                type="text"
+                                class="regular-text"
+                                id="wp_pfg_filter_dropdowns_<?php echo $i; ?>_label"
+                                name="wp_pfg_filter_dropdowns[<?php echo $i; ?>][label]"
+                                value="<?php echo esc_attr( $label ); ?>"
+                                placeholder="e.g. Topic, Content Type, Tag"
+                            />
+                            <p class="description">
+                                Leave blank to disable this dropdown.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row">
+                            Taxonomy
+                        </th>
+                        <td>
+                            <select
+                                name="wp_pfg_filter_dropdowns[<?php echo $i; ?>][taxonomy]"
+                            >
+                                <option value="category" <?php selected( $taxonomy, 'category' ); ?>>
+                                    Categories
+                                </option>
+                                <option value="post_tag" <?php selected( $taxonomy, 'post_tag' ); ?>>
+                                    Tags
+                                </option>
+                            </select>
+                            <p class="description">
+                                Change this and click "Save Changes", then reload to see the correct term list.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row">
+                            Terms to include
+                        </th>
+                        <td>
+                            <?php if ( 'category' === $taxonomy ) : ?>
+
+                                <?php if ( ! empty( $categories ) ) : ?>
+                                    <div style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 8px;">
+                                        <?php foreach ( $categories as $cat ) : ?>
+                                            <?php
+                                            $checked = in_array( (int) $cat->term_id, $selected_terms, true )
+                                                ? 'checked="checked"'
+                                                : '';
+                                            ?>
+                                            <label style="display: block; margin-bottom: 4px;">
+                                                <input
+                                                    type="checkbox"
+                                                    name="wp_pfg_filter_dropdowns[<?php echo $i; ?>][terms][]"
+                                                    value="<?php echo esc_attr( $cat->term_id ); ?>"
+                                                    <?php echo $checked; ?>
+                                                />
+                                                <?php echo esc_html( $cat->name ); ?>
+                                            </label>
+                                        <?php endforeach; ?>
+                                    </div>
+                                <?php else : ?>
+                                    <p>No categories found.</p>
+                                <?php endif; ?>
+
+                            <?php else : // post_tag ?>
+
+                                <?php if ( ! empty( $tags ) && ! is_wp_error( $tags ) ) : ?>
+                                    <div style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 8px;">
+                                        <?php foreach ( $tags as $tag ) : ?>
+                                            <?php
+                                            $checked = in_array( (int) $tag->term_id, $selected_terms, true )
+                                                ? 'checked="checked"'
+                                                : '';
+                                            ?>
+                                            <label style="display: block; margin-bottom: 4px;">
+                                                <input
+                                                    type="checkbox"
+                                                    name="wp_pfg_filter_dropdowns[<?php echo $i; ?>][terms][]"
+                                                    value="<?php echo esc_attr( $tag->term_id ); ?>"
+                                                    <?php echo $checked; ?>
+                                                />
+                                                <?php echo esc_html( $tag->name ); ?>
+                                            </label>
+                                        <?php endforeach; ?>
+                                    </div>
+                                <?php else : ?>
+                                    <p>No tags found.</p>
+                                <?php endif; ?>
+
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                </table>
+            <?php endfor; ?>
 
             <?php submit_button(); ?>
         </form>
     </div>
-    <?php
+<?php
 }
+
 
 
 /**
@@ -285,64 +510,170 @@ function wp_pfg_render_shortcode( $atts ) {
     $posts_data      = array();
 
     while ( $query->have_posts() ) {
-        $query->the_post();
+    $query->the_post();
 
-        $post_categories = get_the_category( get_the_ID() );
-        $cat_slugs       = array();
+    // --- Categories ---
+    $post_categories = get_the_category( get_the_ID() );
+    $cat_slugs       = array();
 
-        if ( ! empty( $post_categories ) ) {
-            foreach ( $post_categories as $cat ) {
-                // Skip categories that are excluded either globally or by shortcode.
-                if ( in_array( $cat->term_id, $all_excluded_cats, true ) ) {
-                    continue;
-                }
+    if ( ! empty( $post_categories ) ) {
+        foreach ( $post_categories as $cat ) {
+            // Skip categories that are excluded either globally or by shortcode.
+            if ( in_array( $cat->term_id, $all_excluded_cats, true ) ) {
+                continue;
+            }
 
-                $cat_slugs[] = esc_attr( $cat->slug );
-                $categories_used[ $cat->slug ] = $cat->name;
+            $slug = esc_attr( $cat->slug );
+            $cat_slugs[] = $slug;
+
+            // Still track this if you want a list of used categories elsewhere.
+            $categories_used[ $cat->slug ] = $cat->name;
+        }
+    }
+
+    // --- Tags ---
+    $post_tags = get_the_terms( get_the_ID(), 'post_tag' );
+    $tag_slugs = array();
+
+    if ( ! empty( $post_tags ) && ! is_wp_error( $post_tags ) ) {
+        foreach ( $post_tags as $tag ) {
+            $tag_slugs[] = esc_attr( $tag->slug );
+        }
+    }
+
+    // --- Combined tokens for front-end filtering ---
+    // We prefix with taxonomy so "news" category vs "news" tag don't collide.
+    $term_tokens = array();
+
+    foreach ( $cat_slugs as $slug ) {
+        $term_tokens[] = 'category:' . $slug;
+    }
+
+    foreach ( $tag_slugs as $slug ) {
+        $term_tokens[] = 'post_tag:' . $slug;
+    }
+
+    $posts_data[] = array(
+        'ID'        => get_the_ID(),
+        'title'     => get_the_title(),
+        'excerpt'   => get_the_excerpt(),
+        'permalink' => get_permalink(),
+        'thumbnail' => get_the_post_thumbnail( get_the_ID(), 'medium' ),
+        'cats'      => $cat_slugs,
+        'tags'      => $tag_slugs,
+        'terms'     => $term_tokens,
+    );
+}
+
+
+    // Restore global $post.
+// Restore global $post.
+wp_reset_postdata();
+
+/**
+ * Build dropdown data for the front-end from the saved settings.
+ */
+$raw_dropdowns        = get_option( 'wp_pfg_filter_dropdowns', array() );
+$dropdowns_for_render = array();
+
+if ( is_array( $raw_dropdowns ) ) {
+    foreach ( $raw_dropdowns as $dropdown ) {
+        $label    = isset( $dropdown['label'] ) ? trim( $dropdown['label'] ) : '';
+        $taxonomy = isset( $dropdown['taxonomy'] ) ? $dropdown['taxonomy'] : 'category';
+        $terms    = isset( $dropdown['terms'] ) && is_array( $dropdown['terms'] ) ? $dropdown['terms'] : array();
+
+        if ( '' === $label || empty( $terms ) ) {
+            // Skip empty or disabled dropdowns.
+            continue;
+        }
+
+        $term_data = array();
+
+        foreach ( $terms as $term_id ) {
+            $term_id = (int) $term_id;
+            if ( $term_id <= 0 ) {
+                continue;
+            }
+
+            $term = get_term( $term_id );
+            if ( $term instanceof WP_Term && ! is_wp_error( $term ) ) {
+                $token = $term->taxonomy . ':' . $term->slug;
+
+                $term_data[] = array(
+                    'id'    => $term->term_id,
+                    'slug'  => $term->slug,
+                    'name'  => $term->name,
+                    'token' => $token,
+                );
             }
         }
 
-        $posts_data[] = array(
-            'ID'        => get_the_ID(),
-            'title'     => get_the_title(),
-            'excerpt'   => get_the_excerpt(),
-            'permalink' => get_permalink(),
-            'thumbnail' => get_the_post_thumbnail( get_the_ID(), 'medium' ),
-            'cats'      => $cat_slugs,
-        );
+        if ( ! empty( $term_data ) ) {
+            $dropdowns_for_render[] = array(
+                'label'    => $label,
+                'taxonomy' => $taxonomy,
+                'terms'    => $term_data,
+            );
+        }
     }
+}
 
-    // Restore global $post.
-    wp_reset_postdata();
+ob_start();
+?>
+<div class="wp-pfg-wrapper">
 
-    ob_start();
-    ?>
-    <div class="wp-pfg-wrapper">
 
-        <!-- Filter Buttons -->
+    <!-- Filter Dropdowns -->
+    <?php if ( ! empty( $dropdowns_for_render ) ) : ?>
         <div class="wp-pfg-filters">
-            <button class="wp-pfg-filter-button is-active" data-filter="all">
-                All
-            </button>
+            <?php foreach ( $dropdowns_for_render as $dropdown ) : ?>
+                <label class="wp-pfg-filter-dropdown">
+                    <span class="wp-pfg-filter-label">
+                        <?php echo esc_html( $dropdown['label'] ); ?>
+                    </span>
 
-            <?php foreach ( $categories_used as $slug => $name ) : ?>
-                <button class="wp-pfg-filter-button" data-filter="<?php echo esc_attr( $slug ); ?>">
-                    <?php echo esc_html( $name ); ?>
-                </button>
+                    <select
+                        class="wp-pfg-filter-select"
+                        data-taxonomy="<?php echo esc_attr( $dropdown['taxonomy'] ); ?>"
+                    >
+                        <option value="">
+                            <?php esc_html_e( 'All', 'wp-pfg' ); ?>
+                        </option>
+
+                        <?php foreach ( $dropdown['terms'] as $term ) : ?>
+                            <option value="<?php echo esc_attr( $term['token'] ); ?>">
+                                <?php echo esc_html( $term['name'] ); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
             <?php endforeach; ?>
         </div>
+    <?php endif; ?>
 
-        <!-- Post Grid -->
-        <div class="wp-pfg-grid">
-            <?php foreach ( $posts_data as $post ) : ?>
-                <?php
-                // Build the space-separated class list for this card's categories.
-                $cat_classes = '';
-                if ( ! empty( $post['cats'] ) ) {
-                    $cat_classes = implode( ' ', $post['cats'] );
-                }
-                ?>
-                <article class="wp-pfg-card" data-categories="<?php echo esc_attr( $cat_classes ); ?>">
+
+<!-- Post Grid -->
+<div class="wp-pfg-grid">
+    <?php foreach ( $posts_data as $post ) : ?>
+        <?php
+        // Space-separated categories.
+        $cat_classes = '';
+        if ( ! empty( $post['cats'] ) ) {
+            $cat_classes = implode( ' ', $post['cats'] );
+        }
+
+        // Space-separated tokens like "category:news post_tag:featured".
+        $term_tokens_attr = '';
+        if ( ! empty( $post['terms'] ) ) {
+            $term_tokens_attr = implode( ' ', $post['terms'] );
+        }
+        ?>
+        <article
+            class="wp-pfg-card"
+            data-categories="<?php echo esc_attr( $cat_classes ); ?>"
+            data-terms="<?php echo esc_attr( $term_tokens_attr ); ?>"
+        >
+
                     <a href="<?php echo esc_url( $post['permalink'] ); ?>" class="wp-pfg-card-inner">
 
                         <?php if ( ! empty( $post['thumbnail'] ) ) : ?>
