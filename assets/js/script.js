@@ -1,84 +1,129 @@
-// Global-safe, page-builder-proof filtering script
-(function() {
+// WP Post Filter Grid front-end logic: sorting + filtering
+(function () {
     'use strict';
 
     /**
-     * Apply the filters by reading dropdown values and hiding/showing post cards.
+     * Apply dropdown filters within a single wrapper.
      */
-    function applyFilters() {
+    function applyFilters(wrapper) {
+        var dropdowns = wrapper.querySelectorAll('.wp-pfg-filter-select');
+        var cards = wrapper.querySelectorAll('.wp-pfg-card');
+        var activeFilters = [];
 
-        // 1. Collect all active filters
-        const dropdowns = document.querySelectorAll('.wp-pfg-filter-select');
-        const activeFilters = [];
-
-        dropdowns.forEach(drop => {
-            const val = drop.value;
+        dropdowns.forEach(function (select) {
+            var val = select.value;
             if (val && val.trim() !== '') {
                 activeFilters.push(val.trim());
             }
         });
 
-        // 2. Get all cards in the grid
-        const cards = document.querySelectorAll('.wp-pfg-card');
-
-        // 3. If no filters are selected → show everything
         if (activeFilters.length === 0) {
-            cards.forEach(card => card.classList.remove('is-hidden'));
-            return;
+            cards.forEach(function (card) {
+                card.classList.remove('is-hidden');
+            });
+        } else {
+            cards.forEach(function (card) {
+                var termsAttr = card.getAttribute('data-terms') || '';
+                var cardTerms = termsAttr.split(/\s+/).filter(Boolean);
+
+                var matches = activeFilters.every(function (token) {
+                    return cardTerms.indexOf(token) !== -1;
+                });
+
+                if (matches) {
+                    card.classList.remove('is-hidden');
+                } else {
+                    card.classList.add('is-hidden');
+                }
+            });
         }
 
-        // 4. Otherwise filter each card
-        cards.forEach(card => {
+        // Handle "No results" message
+        var noResults = wrapper.querySelector('.wp-pfg-no-results');
+        if (noResults) {
+            var visibleCount = wrapper.querySelectorAll('.wp-pfg-card:not(.is-hidden)').length;
+            noResults.style.display = visibleCount === 0 ? 'block' : 'none';
+        }
+    }
 
-            const termsAttr = card.getAttribute('data-terms');
-            if (!termsAttr || termsAttr.trim() === '') {
-                // No term data → does not match any filter
-                card.classList.add('is-hidden');
-                return;
-            }
+    /**
+     * Sort cards within a single wrapper based on selected option.
+     */
+    function sortCards(wrapper) {
+        var sortSelect = wrapper.querySelector('.wp-pfg-sort-select');
+        if (!sortSelect) return;
 
-            const cardTerms = termsAttr.split(/\s+/);
+        var sortValue = sortSelect.value || 'default';
+        var grid = wrapper.querySelector('.wp-pfg-grid');
+        if (!grid) return;
 
-            // A card must match *every* active filter (AND logic)
-            const matches = activeFilters.every(token => cardTerms.includes(token));
+        var cards = Array.prototype.slice.call(wrapper.querySelectorAll('.wp-pfg-card'));
+        if (cards.length <= 1) return;
 
-            if (matches) {
-                card.classList.remove('is-hidden');
-            } else {
-                card.classList.add('is-hidden');
+        var sorted = cards.slice();
+
+        sorted.sort(function (a, b) {
+            var aDate = parseInt(a.getAttribute('data-date') || '0', 10);
+            var bDate = parseInt(b.getAttribute('data-date') || '0', 10);
+            var aMod = parseInt(a.getAttribute('data-modified') || '0', 10);
+            var bMod = parseInt(b.getAttribute('data-modified') || '0', 10);
+            var aTitle = (a.getAttribute('data-title') || '').toLowerCase();
+            var bTitle = (b.getAttribute('data-title') || '').toLowerCase();
+            var aIndex = parseInt(a.getAttribute('data-index') || '0', 10);
+            var bIndex = parseInt(b.getAttribute('data-index') || '0', 10);
+
+            switch (sortValue) {
+                case 'newest':
+                    return bDate - aDate; // latest date first
+                case 'oldest':
+                    return aDate - bDate; // earliest date first
+                case 'title-asc':
+                    return aTitle.localeCompare(bTitle);
+                case 'title-desc':
+                    return bTitle.localeCompare(aTitle);
+                default: // "default"
+                    return aIndex - bIndex; // original order
             }
         });
-		
-		// Show/hide "No results" message
-const noResults = document.querySelector('.wp-pfg-no-results');
-if (noResults) {
-    const visible = document.querySelectorAll('.wp-pfg-card:not(.is-hidden)');
-    if (visible.length === 0) {
-        noResults.style.display = 'block';
-    } else {
-        noResults.style.display = 'none';
-    }
-}
 
+        // Re-append in new order
+        sorted.forEach(function (card) {
+            grid.appendChild(card);
+        });
     }
-
 
     /**
-     * Guaranteed event listener for dynamically inserted dropdowns.
-     * Works even if Elementor, Avada, or Gutenberg replaces <select>.
+     * Delegated change handler for sort + filter dropdowns.
      */
-    document.addEventListener('change', function(e) {
-        if (e.target && e.target.classList && e.target.classList.contains('wp-pfg-filter-select')) {
-            applyFilters();
+    function onChange(e) {
+        var target = e.target;
+        if (!(target instanceof HTMLElement)) return;
+
+        var wrapper = target.closest('.wp-pfg-wrapper');
+        if (!wrapper) return;
+
+        if (target.classList.contains('wp-pfg-sort-select')) {
+            sortCards(wrapper);
+            applyFilters(wrapper);
+        } else if (target.classList.contains('wp-pfg-filter-select')) {
+            applyFilters(wrapper);
         }
-    });
+    }
 
+    // Handle dropdown changes (sort + filter)
+    document.addEventListener('change', onChange);
 
-    /**
-     * Run an initial filter pass (in case dropdowns have pre-selected values)
-     */
-    document.addEventListener('DOMContentLoaded', function() {
-        applyFilters();
+    // Initial pass: sort (default) + filter based on any preselected values
+    document.addEventListener('DOMContentLoaded', function () {
+        var wrappers = document.querySelectorAll('.wp-pfg-wrapper');
+
+        wrappers.forEach(function (wrapper) {
+            var sortSelect = wrapper.querySelector('.wp-pfg-sort-select');
+            if (sortSelect) {
+                sortCards(wrapper);
+            }
+            applyFilters(wrapper);
+        });
     });
 
 })();
