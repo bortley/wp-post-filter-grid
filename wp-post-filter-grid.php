@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Post Filter Grid
  * Description: Display blog posts in a responsive grid with real-time taxonomy-based filters. Supports multiple configurations via shortcode IDs.
- * Version: 3.1.0
+ * Version: 3.2.0
  * Author: MarmoAlex
  */
 
@@ -20,18 +20,19 @@ function wp_pfg_enqueue_assets() {
         'wp-pfg-style',
         plugin_dir_url( __FILE__ ) . 'assets/css/style.css',
         array(),
-        '3.1.0'
+        '3.2.0'
     );
 
     wp_enqueue_script(
         'wp-pfg-script',
         plugin_dir_url( __FILE__ ) . 'assets/js/script.js',
         array(), // vanilla JS only
-        '3.1.0',
+        '3.2.0',
         true
     );
 }
 add_action( 'wp_enqueue_scripts', 'wp_pfg_enqueue_assets' );
+
 
 /**
  * ===================================
@@ -98,6 +99,7 @@ function wp_pfg_sanitize_dropdowns( $input ) {
     return $out;
 }
 
+
 /**
  * ===================================
  *   REGISTER SETTINGS
@@ -105,7 +107,7 @@ function wp_pfg_sanitize_dropdowns( $input ) {
  */
 function wp_pfg_register_settings() {
 
-    // Index of all non-default configs
+    // Index of non-default configs
     register_setting(
         'wp_pfg_settings_group',
         'wp_pfg_config_ids',
@@ -170,6 +172,7 @@ function wp_pfg_register_settings() {
 }
 add_action( 'admin_init', 'wp_pfg_register_settings' );
 
+
 /**
  * ===================================
  *   ADMIN MENUS
@@ -208,6 +211,7 @@ function wp_pfg_add_settings_menu() {
 }
 add_action( 'admin_menu', 'wp_pfg_add_settings_menu' );
 
+
 /**
  * ===================================
  *   DEFAULT CONFIG PAGE
@@ -215,7 +219,7 @@ add_action( 'admin_menu', 'wp_pfg_add_settings_menu' );
  */
 function wp_pfg_render_default_page() {
 
-    // Handle creation of new configuration
+    // Handle creation of a new configuration
     if ( isset( $_POST['wp_pfg_new_config_id'] ) ) {
         check_admin_referer( 'wp_pfg_add_config', 'wp_pfg_add_config_nonce' );
 
@@ -226,7 +230,7 @@ function wp_pfg_render_default_page() {
             $configs   = array_values( array_unique( $configs ) );
             update_option( 'wp_pfg_config_ids', $configs );
 
-            // Initialize options for the new config.
+            // Initialize options for new config
             update_option( 'wp_pfg_included_categories_' . $new, array() );
             update_option( 'wp_pfg_filter_dropdowns_' . $new, array() );
 
@@ -248,7 +252,7 @@ function wp_pfg_render_default_page() {
                         <a href="<?php echo esc_url( admin_url( 'options-general.php?page=wp-pfg-settings-' . $id ) ); ?>">
                             <?php echo esc_html( ucwords( str_replace( array( '-', '_' ), ' ', $id ) ) ); ?>
                         </a>
-                        &nbsp; <code>[wp_post_filter_grid id="<?php echo esc_attr( $id ); ?>"]</code>
+                        &nbsp;<code>[wp_post_filter_grid id="<?php echo esc_attr( $id ); ?>"]</code>
                     </li>
                 <?php endforeach; ?>
             <?php else : ?>
@@ -261,13 +265,11 @@ function wp_pfg_render_default_page() {
             <?php wp_nonce_field( 'wp_pfg_add_config', 'wp_pfg_add_config_nonce' ); ?>
             <p>
                 <label>
-                    Configuration ID (lowercase, no spaces; dashes/underscores OK):<br>
+                    Configuration ID (lowercase, no spaces; dashes/underscores OK):<br />
                     <input type="text" name="wp_pfg_new_config_id" class="regular-text" required />
                 </label>
             </p>
-            <p>
-                <button type="submit" class="button button-primary">Create Configuration</button>
-            </p>
+            <p><button type="submit" class="button button-primary">Create Configuration</button></p>
         </form>
 
         <hr />
@@ -276,6 +278,7 @@ function wp_pfg_render_default_page() {
     </div>
     <?php
 }
+
 
 /**
  * ===================================
@@ -295,14 +298,14 @@ function wp_pfg_render_config_page( $config_id ) {
     <?php
 }
 
+
 /**
  * ===================================
- *   UNIVERSAL SETTINGS FORM FOR A CONFIG
+ *   UNIVERSAL SETTINGS FORM
  * ===================================
  */
 function wp_pfg_render_settings_form( $config_id ) {
 
-    // Option names for this config
     if ( 'default' === $config_id ) {
         $included_option = 'wp_pfg_included_categories';
         $dropdown_option = 'wp_pfg_filter_dropdowns';
@@ -321,18 +324,8 @@ function wp_pfg_render_settings_form( $config_id ) {
         $dropdowns = array();
     }
 
-    $categories = get_categories(
-        array(
-            'hide_empty' => false,
-        )
-    );
-
-    $tags = get_terms(
-        array(
-            'taxonomy'   => 'post_tag',
-            'hide_empty' => false,
-        )
-    );
+    $categories = get_categories( array( 'hide_empty' => false ) );
+    $tags       = get_terms( array( 'taxonomy' => 'post_tag', 'hide_empty' => false ) );
     ?>
     <form method="post" action="options.php">
         <?php settings_fields( 'wp_pfg_settings_group' ); ?>
@@ -489,6 +482,7 @@ function wp_pfg_render_settings_form( $config_id ) {
     <?php
 }
 
+
 /**
  * ===================================
  *   HELPER: CATEGORY SLUGS → IDs
@@ -512,6 +506,7 @@ function wp_pfg_get_category_ids_from_slugs( $string ) {
     return $ids;
 }
 
+
 /**
  * ===================================
  *   SHORTCODE FRONT-END OUTPUT
@@ -534,7 +529,7 @@ function wp_pfg_render_shortcode( $atts ) {
 
     $config_id = sanitize_key( $atts['id'] );
 
-    // Determine which options to read for this config
+    // Determine options for this config
     if ( $config_id ) {
         $included_option = 'wp_pfg_included_categories_' . $config_id;
         $dropdown_option = 'wp_pfg_filter_dropdowns_' . $config_id;
@@ -543,13 +538,13 @@ function wp_pfg_render_shortcode( $atts ) {
         $dropdown_option = 'wp_pfg_filter_dropdowns';
     }
 
-    // Config-level "include categories"
+    // Config-level includes
     $config_included = get_option( $included_option, array() );
     if ( ! is_array( $config_included ) ) {
         $config_included = array();
     }
 
-    // Shortcode-level include_cats (slugs)
+    // Shortcode-level include_cats
     $shortcode_included = wp_pfg_get_category_ids_from_slugs( $atts['include_cats'] );
 
     $all_included = array_unique(
@@ -561,7 +556,7 @@ function wp_pfg_render_shortcode( $atts ) {
         )
     );
 
-    // Build query
+    // Query posts
     $query_args = array(
         'post_type'      => 'post',
         'post_status'    => 'publish',
@@ -577,8 +572,8 @@ function wp_pfg_render_shortcode( $atts ) {
         return '<p>No posts found.</p>';
     }
 
-    $posts     = array();
-    $index     = 0;
+    $posts = array();
+    $index = 0;
 
     while ( $query->have_posts() ) {
         $query->the_post();
@@ -607,22 +602,27 @@ function wp_pfg_render_shortcode( $atts ) {
             $tokens[] = 'post_tag:' . $slug;
         }
 
+        $title     = get_the_title();
+        $excerpt   = get_the_excerpt();
+        $search    = strtolower( $title . ' ' . wp_strip_all_tags( $excerpt ) );
+
         $posts[] = array(
-            'title'       => get_the_title(),
-            'title_attr'  => strtolower( get_the_title() ),
-            'excerpt'     => get_the_excerpt(),
+            'title'       => $title,
+            'title_attr'  => strtolower( $title ),
+            'excerpt'     => $excerpt,
             'permalink'   => get_permalink(),
             'thumb'       => get_the_post_thumbnail( get_the_ID(), 'medium' ),
             'terms'       => implode( ' ', $tokens ),
             'date'        => get_the_date( 'U' ),
             'modified'    => get_the_modified_date( 'U' ),
             'index'       => $index,
+            'search'      => $search,
         );
         $index++;
     }
     wp_reset_postdata();
 
-    // Dropdowns for this config
+    // Config dropdowns
     $dropdowns = get_option( $dropdown_option, array() );
     if ( ! is_array( $dropdowns ) ) {
         $dropdowns = array();
@@ -636,6 +636,20 @@ function wp_pfg_render_shortcode( $atts ) {
 
         <?php if ( $has_multiple_posts || ! empty( $dropdowns ) ) : ?>
             <div class="wp-pfg-filters">
+
+                <!-- Search input -->
+                <label class="wp-pfg-filter-dropdown wp-pfg-search-wrapper">
+                    <span class="wp-pfg-filter-label">
+                        <?php esc_html_e( 'Search', 'wp-pfg' ); ?>
+                    </span>
+                    <input
+                        type="text"
+                        class="wp-pfg-search-input"
+                        placeholder="<?php esc_attr_e( 'Search posts…', 'wp-pfg' ); ?>"
+                    />
+                </label>
+
+                <!-- Sort dropdown -->
                 <?php if ( $has_multiple_posts ) : ?>
                     <label class="wp-pfg-filter-dropdown wp-pfg-sort-dropdown">
                         <span class="wp-pfg-filter-label"><?php esc_html_e( 'Sort by', 'wp-pfg' ); ?></span>
@@ -649,12 +663,14 @@ function wp_pfg_render_shortcode( $atts ) {
                     </label>
                 <?php endif; ?>
 
+                <!-- Filter dropdowns -->
                 <?php if ( ! empty( $dropdowns ) ) : ?>
                     <?php foreach ( $dropdowns as $dropdown ) : ?>
                         <?php
                         if ( empty( $dropdown['label'] ) || empty( $dropdown['terms'] ) ) {
                             continue;
                         }
+
                         $taxonomy  = isset( $dropdown['taxonomy'] ) ? $dropdown['taxonomy'] : 'category';
                         $term_ids  = is_array( $dropdown['terms'] ) ? $dropdown['terms'] : array();
                         $term_data = array();
@@ -666,7 +682,7 @@ function wp_pfg_render_shortcode( $atts ) {
                             }
                             $term = get_term( $term_id );
                             if ( $term && ! is_wp_error( $term ) ) {
-                                $token = $term->taxonomy . ':' . $term->slug;
+                                $token       = $term->taxonomy . ':' . $term->slug;
                                 $term_data[] = array(
                                     'name'  => $term->name,
                                     'token' => $token,
@@ -693,6 +709,7 @@ function wp_pfg_render_shortcode( $atts ) {
                         </label>
                     <?php endforeach; ?>
                 <?php endif; ?>
+
             </div>
         <?php endif; ?>
 
@@ -709,6 +726,7 @@ function wp_pfg_render_shortcode( $atts ) {
                     data-modified="<?php echo esc_attr( $p['modified'] ); ?>"
                     data-title="<?php echo esc_attr( $p['title_attr'] ); ?>"
                     data-index="<?php echo esc_attr( $p['index'] ); ?>"
+                    data-search="<?php echo esc_attr( $p['search'] ); ?>"
                 >
                     <a href="<?php echo esc_url( $p['permalink'] ); ?>" class="wp-pfg-card-inner">
 

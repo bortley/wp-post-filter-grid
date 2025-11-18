@@ -99,7 +99,7 @@
 }
 
 /* Hidden state for filtered-out cards */
-.wp-pfg-card.is-hidden {
+.wp-pfg-card.is-hidden, .wp-pfg-card.search-hidden {
     opacity: 0;
     pointer-events: none;
     /* Optional: remove from layout visually but keep for screen readers if needed.
@@ -130,15 +130,6 @@
     font-size: 0.9rem;
 }
 
-.wp-pfg-sort-select {
-    min-width: 160px;
-    padding: 0.35rem 0.6rem;
-    border-radius: 999px;
-    border: 1px solid #ddd;
-    background: #fff;
-    font-size: 0.9rem;
-}
-
 .wp-pfg-no-results {
     text-align: center;
     padding: 2rem 1rem;
@@ -161,3 +152,16 @@
     background: #fff; 
 }
 
+.wp-pfg-sort-select {
+    min-width: 160px;
+    padding: 0.35rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid #ddd;
+    background: #fff;
+    font-size: 0.9rem;
+}
+
+.wp-pfg-search-wrapper input.wp-pfg-search-input {
+    min-width: 200px;
+    padding: 4px 8px;
+}
