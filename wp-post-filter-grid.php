@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: WP Post Filter Grid
- * Description: Display blog posts in a responsive grid with real-time taxonomy-based filters. Supports multiple configurations via shortcode IDs.
- * Version: 3.2.0
+ * Description: Display blog posts in a responsive grid with real-time taxonomy filters, search, sort, and multiple configurations via shortcode IDs.
+ * Version: 3.3.0
  * Author: MarmoAlex
  */
 
@@ -20,14 +20,14 @@ function wp_pfg_enqueue_assets() {
         'wp-pfg-style',
         plugin_dir_url( __FILE__ ) . 'assets/css/style.css',
         array(),
-        '3.2.0'
+        '3.3.0'
     );
 
     wp_enqueue_script(
         'wp-pfg-script',
         plugin_dir_url( __FILE__ ) . 'assets/js/script.js',
         array(), // vanilla JS only
-        '3.2.0',
+        '3.3.0',
         true
     );
 }
@@ -218,14 +218,21 @@ add_action( 'admin_menu', 'wp_pfg_add_settings_menu' );
  * ===================================
  */
 function wp_pfg_render_default_page() {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        return;
+    }
 
-    // Handle creation of a new configuration
+    // Handle creation of a new configuration (separate, small form at top)
     if ( isset( $_POST['wp_pfg_new_config_id'] ) ) {
         check_admin_referer( 'wp_pfg_add_config', 'wp_pfg_add_config_nonce' );
 
         $new = sanitize_key( wp_unslash( $_POST['wp_pfg_new_config_id'] ) );
         if ( $new && 'default' !== $new ) {
-            $configs   = get_option( 'wp_pfg_config_ids', array() );
+            $configs = get_option( 'wp_pfg_config_ids', array() );
+            if ( ! is_array( $configs ) ) {
+                $configs = array();
+            }
+
             $configs[] = $new;
             $configs   = array_values( array_unique( $configs ) );
             update_option( 'wp_pfg_config_ids', $configs );
@@ -234,6 +241,7 @@ function wp_pfg_render_default_page() {
             update_option( 'wp_pfg_included_categories_' . $new, array() );
             update_option( 'wp_pfg_filter_dropdowns_' . $new, array() );
 
+            // Redirect to its page so refresh doesn't re-submit the form
             wp_safe_redirect( admin_url( 'options-general.php?page=wp-pfg-settings-' . $new ) );
             exit;
         }
@@ -244,9 +252,22 @@ function wp_pfg_render_default_page() {
     <div class="wrap">
         <h1>Post Filter Grid — Default Configuration</h1>
 
-        <h2>Existing Configurations</h2>
+        <!-- SEPARATE CREATE-CONFIG FORM (no settings_fields here) -->
+        <h2>Add New Configuration</h2>
+        <form method="post">
+            <?php wp_nonce_field( 'wp_pfg_add_config', 'wp_pfg_add_config_nonce' ); ?>
+            <p>
+                <label>
+                    Configuration ID (lowercase, no spaces; dashes/underscores OK):<br />
+                    <input type="text" name="wp_pfg_new_config_id" class="regular-text" required />
+                </label>
+            </p>
+            <p><button type="submit" class="button button-primary">Create Configuration</button></p>
+        </form>
+
+        <h2 style="margin-top:2em;">Existing Configurations</h2>
         <ul>
-            <?php if ( ! empty( $config_ids ) ) : ?>
+            <?php if ( ! empty( $config_ids ) && is_array( $config_ids ) ) : ?>
                 <?php foreach ( $config_ids as $id ) : ?>
                     <li>
                         <a href="<?php echo esc_url( admin_url( 'options-general.php?page=wp-pfg-settings-' . $id ) ); ?>">
@@ -259,18 +280,6 @@ function wp_pfg_render_default_page() {
                 <li><em>No additional configurations created yet.</em></li>
             <?php endif; ?>
         </ul>
-
-        <h2>Add New Configuration</h2>
-        <form method="post">
-            <?php wp_nonce_field( 'wp_pfg_add_config', 'wp_pfg_add_config_nonce' ); ?>
-            <p>
-                <label>
-                    Configuration ID (lowercase, no spaces; dashes/underscores OK):<br />
-                    <input type="text" name="wp_pfg_new_config_id" class="regular-text" required />
-                </label>
-            </p>
-            <p><button type="submit" class="button button-primary">Create Configuration</button></p>
-        </form>
 
         <hr />
 
@@ -286,10 +295,13 @@ function wp_pfg_render_default_page() {
  * ===================================
  */
 function wp_pfg_render_config_page( $config_id ) {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        return;
+    }
     ?>
     <div class="wrap">
         <h1>
-            Post Filter Grid — 
+            Post Filter Grid —
             <?php echo esc_html( ucwords( str_replace( array( '-', '_' ), ' ', $config_id ) ) ); ?>
         </h1>
 
@@ -306,6 +318,7 @@ function wp_pfg_render_config_page( $config_id ) {
  */
 function wp_pfg_render_settings_form( $config_id ) {
 
+    // Option names for this config
     if ( 'default' === $config_id ) {
         $included_option = 'wp_pfg_included_categories';
         $dropdown_option = 'wp_pfg_filter_dropdowns';
@@ -440,6 +453,7 @@ function wp_pfg_render_settings_form( $config_id ) {
 
         if (!container || !addBtn) return;
 
+        // Add dropdown
         addBtn.addEventListener('click', function () {
             var index = container.querySelectorAll('.wp-pfg-dropdown-block').length;
 
@@ -469,6 +483,7 @@ function wp_pfg_render_settings_form( $config_id ) {
             container.insertAdjacentHTML('beforeend', html);
         });
 
+        // Remove dropdown
         container.addEventListener('click', function (e) {
             if (e.target.classList.contains('wp-pfg-remove-dropdown')) {
                 var block = e.target.closest('.wp-pfg-dropdown-block');
@@ -602,9 +617,9 @@ function wp_pfg_render_shortcode( $atts ) {
             $tokens[] = 'post_tag:' . $slug;
         }
 
-        $title     = get_the_title();
-        $excerpt   = get_the_excerpt();
-        $search    = strtolower( $title . ' ' . wp_strip_all_tags( $excerpt ) );
+        $title   = get_the_title();
+        $excerpt = get_the_excerpt();
+        $search  = strtolower( $title . ' ' . wp_strip_all_tags( $excerpt ) );
 
         $posts[] = array(
             'title'       => $title,
