@@ -165,3 +165,21 @@
     min-width: 200px;
     padding: 4px 8px;
 }
+
+.wp-pfg-clear-filters.button {
+    min-width: 160px;
+    padding: 0.8rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid #ddd;
+    background: #fff;
+    font-size: 0.9rem;
+	border-radius: 999px;
+	background-color: #fff;
+	font-family:'Mulish';
+	max-height: 66%;
+	align-self: flex-end;
+}
+
+.wp-pfg-clear-filters.button:hover {
+	color: #f04;
+}

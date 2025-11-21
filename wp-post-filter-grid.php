@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Post Filter Grid
  * Description: Display blog posts in a responsive grid with real-time taxonomy filters, search, sort, and multiple configurations via shortcode IDs.
- * Version: 3.3.0
+ * Version: 3.4.0
  * Author: MarmoAlex
  */
 
@@ -20,14 +20,14 @@ function wp_pfg_enqueue_assets() {
         'wp-pfg-style',
         plugin_dir_url( __FILE__ ) . 'assets/css/style.css',
         array(),
-        '3.3.0'
+        '3.4.0'
     );
 
     wp_enqueue_script(
         'wp-pfg-script',
         plugin_dir_url( __FILE__ ) . 'assets/js/script.js',
         array(), // vanilla JS only
-        '3.3.0',
+        '3.4.0',
         true
     );
 }
@@ -222,7 +222,29 @@ function wp_pfg_render_default_page() {
         return;
     }
 
-    // Handle creation of a new configuration (separate, small form at top)
+    // Handle delete configuration (small form per row)
+    if ( isset( $_POST['wp_pfg_delete_config_id'] ) ) {
+        $id = sanitize_key( wp_unslash( $_POST['wp_pfg_delete_config_id'] ) );
+
+        check_admin_referer( 'wp_pfg_delete_config_' . $id, 'wp_pfg_delete_config_nonce' );
+
+        $configs = get_option( 'wp_pfg_config_ids', array() );
+        if ( ! is_array( $configs ) ) {
+            $configs = array();
+        }
+
+        $configs = array_diff( $configs, array( $id ) );
+        update_option( 'wp_pfg_config_ids', array_values( $configs ) );
+
+        // Remove config-specific options
+        delete_option( 'wp_pfg_included_categories_' . $id );
+        delete_option( 'wp_pfg_filter_dropdowns_' . $id );
+
+        wp_safe_redirect( admin_url( 'options-general.php?page=wp-pfg-default' ) );
+        exit;
+    }
+
+    // Handle creation of a new configuration (separate form at top)
     if ( isset( $_POST['wp_pfg_new_config_id'] ) ) {
         check_admin_referer( 'wp_pfg_add_config', 'wp_pfg_add_config_nonce' );
 
@@ -241,7 +263,6 @@ function wp_pfg_render_default_page() {
             update_option( 'wp_pfg_included_categories_' . $new, array() );
             update_option( 'wp_pfg_filter_dropdowns_' . $new, array() );
 
-            // Redirect to its page so refresh doesn't re-submit the form
             wp_safe_redirect( admin_url( 'options-general.php?page=wp-pfg-settings-' . $new ) );
             exit;
         }
@@ -252,7 +273,7 @@ function wp_pfg_render_default_page() {
     <div class="wrap">
         <h1>Post Filter Grid — Default Configuration</h1>
 
-        <!-- SEPARATE CREATE-CONFIG FORM (no settings_fields here) -->
+        <!-- Create configuration form (isolated) -->
         <h2>Add New Configuration</h2>
         <form method="post">
             <?php wp_nonce_field( 'wp_pfg_add_config', 'wp_pfg_add_config_nonce' ); ?>
@@ -269,11 +290,20 @@ function wp_pfg_render_default_page() {
         <ul>
             <?php if ( ! empty( $config_ids ) && is_array( $config_ids ) ) : ?>
                 <?php foreach ( $config_ids as $id ) : ?>
-                    <li>
+                    <li style="margin-bottom:8px;">
                         <a href="<?php echo esc_url( admin_url( 'options-general.php?page=wp-pfg-settings-' . $id ) ); ?>">
                             <?php echo esc_html( ucwords( str_replace( array( '-', '_' ), ' ', $id ) ) ); ?>
                         </a>
                         &nbsp;<code>[wp_post_filter_grid id="<?php echo esc_attr( $id ); ?>"]</code>
+
+                        <!-- Delete configuration (inline form) -->
+                        <form method="post" style="display:inline;" onsubmit="return confirm('Delete configuration <?php echo esc_js( $id ); ?>? This cannot be undone.');">
+                            <?php wp_nonce_field( 'wp_pfg_delete_config_' . $id, 'wp_pfg_delete_config_nonce' ); ?>
+                            <input type="hidden" name="wp_pfg_delete_config_id" value="<?php echo esc_attr( $id ); ?>">
+                            <button type="submit" class="button-link-delete" style="color:#b32d2e; margin-left:10px;">
+                                <?php esc_html_e( 'Delete', 'wp-pfg' ); ?>
+                            </button>
+                        </form>
                     </li>
                 <?php endforeach; ?>
             <?php else : ?>
@@ -453,7 +483,7 @@ function wp_pfg_render_settings_form( $config_id ) {
 
         if (!container || !addBtn) return;
 
-        // Add dropdown
+        // Add dropdown block
         addBtn.addEventListener('click', function () {
             var index = container.querySelectorAll('.wp-pfg-dropdown-block').length;
 
@@ -483,7 +513,7 @@ function wp_pfg_render_settings_form( $config_id ) {
             container.insertAdjacentHTML('beforeend', html);
         });
 
-        // Remove dropdown
+        // Remove dropdown block
         container.addEventListener('click', function (e) {
             if (e.target.classList.contains('wp-pfg-remove-dropdown')) {
                 var block = e.target.closest('.wp-pfg-dropdown-block');
@@ -678,6 +708,8 @@ function wp_pfg_render_shortcode( $atts ) {
                     </label>
                 <?php endif; ?>
 
+
+
                 <!-- Filter dropdowns -->
                 <?php if ( ! empty( $dropdowns ) ) : ?>
                     <?php foreach ( $dropdowns as $dropdown ) : ?>
@@ -725,6 +757,11 @@ function wp_pfg_render_shortcode( $atts ) {
                     <?php endforeach; ?>
                 <?php endif; ?>
 
+				                <!-- Clear Filters button -->
+                <button type="button" class="wp-pfg-clear-filters button">
+                    <?php esc_html_e( 'Clear Filters', 'wp-pfg' ); ?>
+                </button>
+				
             </div>
         <?php endif; ?>
 

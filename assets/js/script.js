@@ -1,4 +1,4 @@
-// WP Post Filter Grid front-end logic: search + sorting + filtering
+// WP Post Filter Grid front-end logic: search + sorting + filtering + clear filters
 (function () {
     'use strict';
 
@@ -157,6 +157,40 @@
 
         // Re-apply search + filters; keep current sort order
         runPipeline(wrapper, { sort: false, filters: true, search: true });
+    });
+
+    /**
+     * Handle click on "Clear Filters" button.
+     */
+    document.addEventListener('click', function (e) {
+        const target = e.target;
+        if (!(target instanceof HTMLElement)) return;
+
+        if (!target.classList.contains('wp-pfg-clear-filters')) return;
+
+        const wrapper = target.closest('.wp-pfg-wrapper');
+        if (!wrapper) return;
+
+        // Reset search
+        const searchInput = wrapper.querySelector('.wp-pfg-search-input');
+        if (searchInput) {
+            searchInput.value = '';
+        }
+
+        // Reset sort
+        const sortSelect = wrapper.querySelector('.wp-pfg-sort-select');
+        if (sortSelect) {
+            sortSelect.value = 'default';
+        }
+
+        // Reset taxonomy filter dropdowns
+        const filterSelects = wrapper.querySelectorAll('.wp-pfg-filter-select');
+        filterSelects.forEach(sel => {
+            sel.value = '';
+        });
+
+        // Run full pipeline
+        runPipeline(wrapper, { sort: true, filters: true, search: true });
     });
 
     /**
