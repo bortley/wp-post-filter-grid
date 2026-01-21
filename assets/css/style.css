@@ -10,6 +10,7 @@
     flex-wrap: wrap;
     gap: 0.5rem;
     margin-bottom: 1.5rem;
+	place-content: center;
 }
 
 /* Individual filter buttons */
@@ -33,18 +34,35 @@
 /* Grid container: responsive cards */
 .wp-pfg-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(350px, 350px));
     gap: 1.5rem;
+	place-content: center;
+}
+
+@media (max-width: 600px) {
+	.wp-pfg-grid {
+		grid-template-columns: repeat(auto-fit, minmax(100px, 45%));
+	}
 }
 
 /* Card styles */
 .wp-pfg-card {
+	width: auto;
     background: #fff;
     border-radius: 10px;
     border: 0;
     overflow: hidden;
     box-shadow: 4px 2px 13px -7px #888;
     transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+@media (max-width: 600px) {
+	.wp-pfg-card {
+		width: auto;
+		max-width: 250px;
+	}
 }
 
 /* Card becomes slightly elevated on hover */
@@ -76,9 +94,16 @@
 
 /* Title styling */
 .wp-pfg-card-title {
-    font-size: 20px !important;
-    font-family: "Mulish" !important;
+    font-size: 20px;
+    font-family: "Mulish Bold";
     margin: 0 0 0.5rem;
+	line-height: 1.1;
+}
+
+@media (max-width: 600px) {
+	.wp-pfg-card-title {
+    font-size: 14px;
+	}
 }
 
 /* Excerpt styling */
@@ -91,11 +116,17 @@
 
 /* Read more link styling */
 .wp-pfg-card-readmore {
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: #f04;
+}
+
+@media (max-width: 600px) {
+	.wp-pfg-card-readmore {
+		font-size: 0.6rem;
+	}
 }
 
 /* Hidden state for filtered-out cards */
@@ -168,7 +199,7 @@
 
 .wp-pfg-clear-filters.button {
     min-width: 160px;
-    padding: 0.8rem 0.6rem;
+    padding: 0.35rem 0.6rem;
     border-radius: 999px;
     border: 1px solid #ddd;
     background: #fff;
@@ -178,8 +209,55 @@
 	font-family:'Mulish';
 	max-height: 66%;
 	align-self: flex-end;
+	color: #222;
 }
 
 .wp-pfg-clear-filters.button:hover {
 	color: #f04;
 }
+
+/* Toggle button hidden on desktop */
+.wp-pfg-filters-toggle {
+    display: none;
+}
+
+/* Optional badge styling (feel free to tweak) */
+.wp-pfg-filters-count {
+    margin-left: 6px;
+    font-weight: 600;
+}
+
+/* Mobile filter toggle */
+.wp-pfg-filters-toggle {
+    display: none; /* desktop default */
+    padding: 0.35rem 0.8rem;
+    border-radius: 999px;
+    border: 1px solid #ddd;
+    background: #fff;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.wp-pfg-filters-toggle:hover {
+    color: #f04;
+}
+
+/* On mobile: hide filters by default, show toggle button */
+@media (max-width: 768px) {
+    .wp-pfg-filters-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        margin-bottom: 0.75rem;
+		color: #222;
+    }
+
+    .wp-pfg-filters {
+        display: none;
+    }
+
+    .wp-pfg-wrapper.is-filters-open .wp-pfg-filters {
+        display: flex;
+    }
+}
+
